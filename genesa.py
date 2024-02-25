@@ -92,7 +92,7 @@ class HotkeyATMT(HotkeyTracker):
 g_running = True
 g_tracking = False
 g_key_queue = queue.Queue()
-hotkeys = [
+g_hotkeys = [
 	HotkeySimple(['ctrl','c'], lambda _: trigger_exit() or -1),
 ]
 
@@ -153,8 +153,8 @@ def xXxRealHandleKeypressxXx(event, was_pressed: dict):
 def input_thread_func():
 	""" """
 	global g_running, g_tracking
+	
 	was_pressed = {}
-
 	while g_running:
 		event = kbd.read_event() # suppress=g_tracking)
 
@@ -165,7 +165,7 @@ def input_thread_func():
 
 		if stat == Config.PRESS_PRESSED:
 			# parse hotkeys
-			for hk in hotkeys:
+			for hk in g_hotkeys:
 				if hk.check(event) < 0: break
 			if not g_running: break
 
