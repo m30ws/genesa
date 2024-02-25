@@ -30,9 +30,71 @@ class QueueEvent:
 		return f'QueueEvent(type={self.typ}, name={self.name})'
 
 
-g_key_queue = queue.Queue()
+class HotkeyTracker:
+	def __init__(self, press_seq, cb):
+		""" """
+		self.press_seq = press_seq
+		self.cb = cb
+
+	def check(self, event):
+		""" """
+		return 0
+
+
+class HotkeySimple(HotkeyTracker):
+	def __init__(self, press_seq, cb):
+		""" """
+		super(HotkeySimple, self).__init__(press_seq, cb)
+		self.idx = 0
+
+	def check(self, event):
+		""" """
+		if event.name == self.press_seq[self.idx]:
+			if event.event_type == kbd.KEY_UP:
+				self.idx = 0
+				return 0
+
+			elif event.event_type == kbd.KEY_DOWN:
+				self.idx += 1
+
+				# check if complete hotkey captured
+				if self.idx >= len(self.press_seq):
+					self.idx = 0
+
+					# still note down keypress
+					if g_tracking:
+						g_key_queue.put(QueueEvent('key', event.name))
+						log_event(f'pressed: {event.name}')
+
+					return self.cb(event) or 0
+				else:
+					# continue capturing in next iteration
+					return 0
+			else:
+				return 0
+
+		else:
+			if event.event_type == kbd.KEY_DOWN:
+				self.idx = 0
+			return 0
+
+
+class HotkeyATMT(HotkeyTracker):
+	def __init__(self, press_seq, cb):
+		""" """
+		HotkeyTracker.__init__(press_seq, cb)
+
+	def check(self, event):
+		""" """
+		pass
+
+
 g_running = True
 g_tracking = False
+g_key_queue = queue.Queue()
+hotkeys = [
+	HotkeySimple(['ctrl','c'], lambda _: trigger_exit() or -1),
+]
 
 
 def log_event(*args, level=Config.LOG_INFO, **kwargs):
@@ -55,7 +117,7 @@ def trigger_exit():
 	g_key_queue.put(QueueEvent('exit', 'exit key triggered'))
 
 
-def xXxRealHandleKeypressxXx(event, was_pr: dict):
+def xXxRealHandleKeypressxXx(event, was_pressed: dict):
 	""" Parse presses more-properly
 		Used inside of loop after keyboard.read_event()
 		Returns:
@@ -71,29 +133,28 @@ def xXxRealHandleKeypressxXx(event, was_pr: dict):
 			return Config.PRESS_SHOULD_BREAK
 
 		# Initially assume unpressed
-		if event.name not in was_pr:
-			was_pr[event.name] = False
+		if event.name not in was_pressed:
+			was_pressed[event.name] = False
 
-		if was_pr[event.name] == True:
+		if was_pressed[event.name] == True:
 			# Skip if key was not released yet
 			return Config.PRESS_NOTHING_HAPPENED
-		elif was_pr[event.name] == False:
+		elif was_pressed[event.name] == False:
 			# Trigger keypress
-			was_pr[event.name] = True
+			was_pressed[event.name] = True
 			return Config.PRESS_PRESSED
 
 	elif event.event_type == kbd.KEY_UP:
 		# Unpress everyyy key
-		was_pr[event.name] = False
+		was_pressed[event.name] = False
 		return Config.PRESS_RELEASED
 
 
 def input_thread_func():
 	""" """
 	global g_running, g_tracking
-
 	was_pressed = {}
-	ctrl_track = False
+
 	while g_running:
 		event = kbd.read_event() # suppress=g_tracking)
 
@@ -102,14 +163,13 @@ def input_thread_func():
 			trigger_exit()
 			break
 
-		# manually track ctrl+c
-		if event.name == 'ctrl':
-			ctrl_track = (event.event_type == kbd.KEY_DOWN)
-		if ctrl_track and event.name == 'c':
-			trigger_exit()
-			break
-
 		if stat == Config.PRESS_PRESSED:
+			# parse hotkeys
+			for hk in hotkeys:
+				if hk.check(event) < 0: break
+			if not g_running: break
+
+			# parse the rest
 			if event.name == Config.KEY_ACTIVATE_TRACKING:
 				g_tracking = not g_tracking
 				if g_tracking:
