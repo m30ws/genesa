@@ -16,6 +16,11 @@ class Config:
 	LOG_WARNING = 2
 	LOG_ERROR = 3
 
+	PRESS_SHOULD_BREAK     = -1 # if loop should break
+	PRESS_NOTHING_HAPPENED =  0 # if nothing happened
+	PRESS_PRESSED          =  1 # if keypress was triggered
+	PRESS_RELEASED         =  2 # if key was released
+
 
 class QueueEvent:
 	def __init__(self, typ, name):
@@ -44,7 +49,8 @@ def log_event(*args, level=Config.LOG_INFO, **kwargs):
 
 def trigger_exit():
 	""" """
-	global g_running
+	global g_tracking, g_running
+	g_tracking = False
 	g_running = False
 	g_key_queue.put(QueueEvent('exit', 'exit key triggered'))
 
@@ -53,15 +59,16 @@ def xXxRealHandleKeypressxXx(event, was_pr: dict):
 	""" Parse presses more-properly
 		Used inside of loop after keyboard.read_event()
 		Returns:
-			- +1 if keypress was triggered
+			- -1 if loop should break
 			-  0 if nothing happened
-			- -1 if should break loop
+			- +1 if keypress was triggered
+			- +2 if key was released
 	"""
 	if event.event_type == kbd.KEY_DOWN:
 		
 		# Loop exit switch
 		if event.name == Config.KEY_EXIT_LOOP:
-			return -1
+			return Config.PRESS_SHOULD_BREAK
 
 		# Initially assume unpressed
 		if event.name not in was_pr:
@@ -69,16 +76,16 @@ def xXxRealHandleKeypressxXx(event, was_pr: dict):
 
 		if was_pr[event.name] == True:
 			# Skip if key was not released yet
-			return 0
+			return Config.PRESS_NOTHING_HAPPENED
 		elif was_pr[event.name] == False:
 			# Trigger keypress
 			was_pr[event.name] = True
-			return 1
+			return Config.PRESS_PRESSED
 
 	elif event.event_type == kbd.KEY_UP:
 		# Unpress everyyy key
 		was_pr[event.name] = False
-		return 0
+		return Config.PRESS_RELEASED
 
 
 def input_thread_func():
@@ -86,15 +93,23 @@ def input_thread_func():
 	global g_running, g_tracking
 
 	was_pressed = {}
+	ctrl_track = False
 	while g_running:
-		event = kbd.read_event(suppress=g_tracking)
+		event = kbd.read_event() # suppress=g_tracking)
 
 		stat = xXxRealHandleKeypressxXx(event, was_pressed)
-		if stat < 0:
+		if stat == Config.PRESS_SHOULD_BREAK:
 			trigger_exit()
 			break
 
-		elif stat > 0:
+		# manually track ctrl+c
+		if event.name == 'ctrl':
+			ctrl_track = (event.event_type == kbd.KEY_DOWN)
+		if ctrl_track and event.name == 'c':
+			trigger_exit()
+			break
+
+		if stat == Config.PRESS_PRESSED:
 			if event.name == Config.KEY_ACTIVATE_TRACKING:
 				g_tracking = not g_tracking
 				if g_tracking:
@@ -105,6 +120,7 @@ def input_thread_func():
 			else:
 				if not g_tracking:
 					continue
+
 				g_key_queue.put(QueueEvent('key', event.name))
 				log_event(f'pressed: {event.name}')
 
@@ -142,6 +158,9 @@ def main():
 
 	##
 	log_event(f'Tracking [{Config.KEY_ACTIVATE_TRACKING.upper()}]: {g_tracking}')
+	# log_event(f'thread ids:')
+	# for n, t in threads.items():
+	# 	log_event(f'  {n}: {t.native_id}')
 	##
 
 	try:
