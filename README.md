@@ -18,6 +18,7 @@ be tracked.
 
 | Shortcut | Description |
 | :------: | ----------- |
-| F7       | Enables or disables capturing keypresses |
-| Esc      | Quickly exits the program |
+| F1       | Enables or disables capturing keypresses (CLIENT) |
+| F2       | Enables or disables triggering keypresses (HOST) |
+| F8       | Exits the program |
 
