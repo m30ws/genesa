@@ -1,5 +1,7 @@
 import json
+import os
 import queue
+import signal # signal.SIGTERM
 import socket
 import sys
 import threading as thr
@@ -127,7 +129,8 @@ g_triggers = False
 g_key_queue = queue.Queue()
 g_hotkeys = [
 	HotkeySimple(Config.KEY_EXIT_LOOP.split('+'), lambda _: trigger_exit() or -1),
-	# HotkeySimple(['ctrl','q'], lambda _: trigger_exit() or -1),
+	# HotkeySimple(['ctrl','c'], lambda _: trigger_exit() or -1),
+	HotkeySimple(['ctrl','c'], lambda _: log_event(f'forcibly exiting (ctrl+c)', level=Config.LOG_WARNING) or os.kill(os.getpid(), signal.SIGTERM)),
 ]
 g_kind = None # host,client
 g_addr_player_mapping = {} # filled dynamically as players "connect"
