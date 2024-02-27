@@ -9,26 +9,30 @@ import keyboard as kbd
 
 
 class Config:
-	KEY_EXIT_LOOP = 'f8'
-	KEY_ACTIVATE_TRACKING = 'f1'
-	KEY_ACTIVATE_TRIGGERS = 'f2'
+	KEY_EXIT_LOOP 			= 'f8'
+	KEY_ACTIVATE_TRACKING 	= 'f1'
+	KEY_ACTIVATE_TRIGGERS 	= 'f2'
+
 	KEYS_TRACKED = ['left', 'right', 'x'] # ['x', 'y', 'c', 'v', 'a']
 
-	HOST_KINDS = ['host', '1']
-	CLIENT_KINDS = ['client', '2']
-	HOST = 'host'
-	CLIENT = 'client'
-	DEFAULT_HOST = 'localhost'
-	DEFAULT_PORT = 7654
+	HOST_KINDS 		= ['host', '1']
+	CLIENT_KINDS 	= ['client', '2']
+	HOST 			= 'host'
+	CLIENT 			= 'client'
+	DEFAULT_HOST 	= 'localhost'
+	DEFAULT_PORT 	= 7654
 
-	LOG_INFO = 1
-	LOG_WARNING = 2
-	LOG_ERROR = 3
+	LOG_INFO 		= 1
+	LOG_WARNING 	= 2
+	LOG_ERROR 		= 3
 
 	PRESS_SHOULD_BREAK     = -1 # if loop should break
 	PRESS_NOTHING_HAPPENED =  0 # if nothing happened
 	PRESS_PRESSED          =  1 # if keypress was triggered
 	PRESS_RELEASED         =  2 # if key was released
+
+	EVENT_KEY 			= 'key'
+	EVENT_DISCONNECT 	= 'dc'
 
 	NB_LOOP_DELAY = 0.001#s
 
@@ -91,7 +95,7 @@ class HotkeySimple(HotkeyTracker):
 
 					# still note down keypress
 					if g_tracking:
-						g_key_queue.put(new_event('key', event.name))
+						g_key_queue.put(new_event(Config.EVENT_KEY, event.name))
 						log_event(f'pressed: {event.name}')
 
 					return self.cb(event) or 0
@@ -135,7 +139,7 @@ def trigger_exit():
 	global g_tracking, g_running
 
 	if g_kind == Config.CLIENT:
-		g_key_queue.put(new_event('dc', None))
+		g_key_queue.put(new_event(Config.EVENT_DISCONNECT, None))
 		time.sleep(1) # wait until sent
 	
 	g_tracking = False
@@ -216,7 +220,7 @@ def input_thread_func():
 					continue
 
 				if g_kind == Config.CLIENT and event.name in Config.KEYS_TRACKED:
-					g_key_queue.put(new_event('key', event.name))
+					g_key_queue.put(new_event(Config.EVENT_KEY, event.name))
 					log_event(f'pressed: {event.name}')
 
 	log_event('exiting input thread...')
