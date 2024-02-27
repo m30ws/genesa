@@ -16,6 +16,8 @@ class Config:
 
 	HOST_KINDS = ['host', '1']
 	CLIENT_KINDS = ['client', '2']
+	HOST = 'host'
+	CLIENT = 'client'
 	DEFAULT_HOST = 'localhost'
 	DEFAULT_PORT = 7654
 
@@ -131,6 +133,11 @@ g_player_controls_mapping = {} # loaded from disk (as json) on startup
 def trigger_exit():
 	""" """
 	global g_tracking, g_running
+
+	if g_kind == Config.CLIENT:
+		g_key_queue.put(new_event('dc', None))
+		time.sleep(1) # wait until sent
+	
 	g_tracking = False
 	g_running = False
 
@@ -190,14 +197,14 @@ def input_thread_func():
 				break
 
 			# parse the rest
-			if event.name == Config.KEY_ACTIVATE_TRACKING and g_kind != 'host':
+			if event.name == Config.KEY_ACTIVATE_TRACKING and g_kind != Config.HOST:
 				g_tracking = not g_tracking
 				if g_tracking:
 					log_event(f'tracking active [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARNING)
 				else:
 					log_event(f'tracking disabled [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARNING)
 
-			elif event.name == Config.KEY_ACTIVATE_TRIGGERS and g_kind == 'host':
+			elif event.name == Config.KEY_ACTIVATE_TRIGGERS and g_kind == Config.HOST:
 				g_triggers = not g_triggers
 				if g_triggers:
 					log_event(f'triggers active [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]', level=Config.LOG_WARNING)
@@ -208,7 +215,7 @@ def input_thread_func():
 				if not g_tracking:
 					continue
 
-				if g_kind == 'client' and event.name in Config.KEYS_TRACKED:
+				if g_kind == Config.CLIENT and event.name in Config.KEYS_TRACKED:
 					g_key_queue.put(new_event('key', event.name))
 					log_event(f'pressed: {event.name}')
 
@@ -220,7 +227,7 @@ def host_server_thread_func(host=Config.DEFAULT_HOST, port=Config.DEFAULT_PORT):
 	# await user selection in case started early
 	while not g_kind:
 		time.sleep(0.5)
-	if g_kind != 'host':
+	if g_kind != Config.HOST:
 		return
 
 	with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as serv:
@@ -252,7 +259,7 @@ def host_parse_thread_func():
 	# await user selection in case started early
 	while not g_kind:
 		time.sleep(0.5)
-	if g_kind != 'host':
+	if g_kind != Config.HOST:
 		return
 
 	while g_running:
@@ -283,6 +290,7 @@ def host_parse_thread_func():
 				if curr_players < max_players:
 					g_addr_player_mapping[sender] = curr_players
 					player_id = curr_players
+					log_event(f'player {player_id} connected {sender}')
 				else:
 					# if not log error and continue;
 					capac = f'{curr_players}/{max_players}' # print capacity for sanity check
@@ -318,7 +326,7 @@ def client_thread_func(host=Config.DEFAULT_HOST, port=Config.DEFAULT_PORT):
 	# await user selection in case started early
 	while not g_kind:
 		time.sleep(0.5)
-	if g_kind != 'client':
+	if g_kind != Config.CLIENT:
 		return
 
 	with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as serv:
@@ -347,9 +355,9 @@ def select_kind():
 	def set_kind(k):
 		global g_kind
 		if kind in Config.HOST_KINDS:
-			g_kind = 'host'
+			g_kind = Config.HOST
 		elif kind in Config.CLIENT_KINDS:
-			g_kind = 'client'
+			g_kind = Config.CLIENT
 		else:
 			return None
 		return g_kind
@@ -361,7 +369,7 @@ def select_kind():
 
 	# not specified in args or invalid args,
 	# acquire interactively
-	default_kind = 'client'
+	default_kind = Config.CLIENT
 	while True:
 		kind = input(f"1) Host ({'|'.join(Config.HOST_KINDS)})\n" \
 		             f"2) Client ({'|'.join(Config.CLIENT_KINDS)})\n" \
@@ -410,12 +418,13 @@ def main():
 		'host_parse_thread': 	thr.Thread(target=host_parse_thread_func, daemon=True),
 	}
 
-	if kind == 'client':
+	#### 
+	if kind == Config.CLIENT:
 		threads['client_thread'].start()
 		
 		log_event(f'Exit bind [{Config.KEY_EXIT_LOOP.upper()}]')
 		log_event(f'Tracking [{Config.KEY_ACTIVATE_TRACKING.upper()}]: {g_tracking}')
-	else: # == 'host'
+	else: # == Config.HOST
 		load_mappings()
 
 		g_tracking = False
