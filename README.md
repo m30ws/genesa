@@ -12,13 +12,21 @@ same network (e.g. using Hamachi) but the feature is planned in the future.
 Keypress capturing is based on boppreh's `keyboard` library and its copy can be found in the root dir.
 - https://github.com/boppreh/keyboard
 
+## Quick start
+You can specify type in arguments. Otherwise, you will be prompted for it interactively.
+```sh
+py genesa.py
+
+py genesa.py [host|client]
+```
+
 ## Special keybinds
 The program features a few useful keybinds as well as configurable selection of keys that should
 be tracked.
 
 | Shortcut | Description |
 | :------: | ----------- |
-| F1       | Enables or disables capturing keypresses (CLIENT) |
+| F3       | Enables or disables capturing keypresses (CLIENT) |
 | F2       | Enables or disables triggering keypresses (HOST) |
 | F8       | Exits the program |
 
