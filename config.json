@@ -1,4 +1,29 @@
 {
+	"__comment01": "exit after attempting to shutdown child threads",
+	"KEY_EXIT_LOOP": 			"f8",
+
+	"__comment02": "toggle enable/disable capturing keypresses on client ",
+	"KEY_ACTIVATE_TRACKING": 	"f3",
+
+	"__comment03": "toggle enable/disable simulating client keypresses on host",
+	"KEY_ACTIVATE_TRIGGERS": 	"f2",
+
+	"__comment04": "used by client to select keys for capturing; leave empty list to capture ALL keypresses",
+	"__comment05": "Careful, will capture Everything while key tracking is active",
+	"KEYS_TRACKED": [
+		"left","right","up","down",
+		"y", "x", "a", "s",
+		"q", "e", "c", "v"
+	],
+
+	"CONNECT_TO_HOST": "localhost",
+	"CONNECT_TO_PORT": 7654,
+
+	"HOST_ON_IP": "localhost",
+	"HOST_ON_PORT": 7654,
+
+	"__comment06": "host uses these keybinds, mappings ignored in client",
+	"__comment07": "0-n indicate enumerated clients, maps ClientKey->RealHostKey",
 	"keybinds": {
 		"0": {
 			"left": 	"a",

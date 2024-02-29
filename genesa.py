@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 import os
 import queue
@@ -11,30 +12,38 @@ import keyboard as kbd
 
 
 class Config:
-	KEY_EXIT_LOOP 			= 'f8'
-	KEY_ACTIVATE_TRACKING 	= 'f1'
-	KEY_ACTIVATE_TRIGGERS 	= 'f2'
+	KEY_EXIT_LOOP           = 'f8'
+	KEY_ACTIVATE_TRACKING   = 'f3'
+	KEY_ACTIVATE_TRIGGERS   = 'f2'
 
-	KEYS_TRACKED = ['left', 'right', 'x'] # ['x', 'y', 'c', 'v', 'a']
+	KEYS_TRACKED = ['left', 'right', 'x']
+	TRACK_ALL = False # will override KEYS_TRACKED if set
 
-	HOST_KINDS 		= ['host', '1']
-	CLIENT_KINDS 	= ['client', '2']
-	HOST 			= 'host'
-	CLIENT 			= 'client'
-	DEFAULT_HOST 	= 'localhost'
-	DEFAULT_PORT 	= 7654
+	HOST_KINDS      = ['host', '1']
+	CLIENT_KINDS    = ['client', '2']
+	HOST            = 'host'
+	CLIENT          = 'client'
 
-	LOG_INFO 		= 1
-	LOG_WARNING 	= 2
-	LOG_ERROR 		= 3
+	CONNECT_TO_HOST = '25.15.218.148'
+	CONNECT_TO_PORT = 7654
+
+	HOST_ON_IP      = '25.32.2.42'
+	HOST_ON_PORT    = 7654
+
+	LOG_ERROR   = 3
+	LOG_WARN    = 2
+	LOG_INFO    = 1
+	LOG_DEBUG   = 0
+	LOG_LEVEL   = LOG_INFO
 
 	PRESS_SHOULD_BREAK     = -1 # if loop should break
 	PRESS_NOTHING_HAPPENED =  0 # if nothing happened
 	PRESS_PRESSED          =  1 # if keypress was triggered
 	PRESS_RELEASED         =  2 # if key was released
 
-	EVENT_KEY 			= 'key'
-	EVENT_DISCONNECT 	= 'dc'
+	EVENT_KEYPRESS      = 'press'
+	EVENT_KEYRELEASE    = 'release'
+	EVENT_DISCONNECT    = 'dc'
 
 	NB_LOOP_DELAY = 0.001#s
 
@@ -42,13 +51,15 @@ class Config:
 def log_event(*args, level=Config.LOG_INFO, **kwargs):
 	""" """
 	if    level == Config.LOG_INFO:    lvl_txt = 'INFO'
-	elif  level == Config.LOG_WARNING: lvl_txt = 'WARNING'
+	elif  level == Config.LOG_WARN:    lvl_txt = 'WARN'
 	elif  level == Config.LOG_ERROR:   lvl_txt = 'ERROR'
+	elif  level == Config.LOG_DEBUG:   lvl_txt = 'DEBUG'
 	else:                              lvl_txt = 'LOG'
 
-	sys.stderr.write(f'[{lvl_txt}] {time.time():12.6f}: ')
-	sys.stderr.write(*args, **kwargs)
-	sys.stderr.write(f'\n')
+	if level >= Config.LOG_LEVEL:
+		sys.stderr.write(f'[{lvl_txt}] {str(dt.datetime.now()).replace(" ","_")}: ')
+		sys.stderr.write(*args, **kwargs)
+		sys.stderr.write(f'\n')
 
 
 def new_event(typ, name):
@@ -97,7 +108,7 @@ class HotkeySimple(HotkeyTracker):
 
 					# still note down keypress
 					if g_tracking:
-						g_key_queue.put(new_event(Config.EVENT_KEY, event.name))
+						g_key_queue.put(new_event(Config.EVENT_KEYPRESS, event.name))
 						log_event(f'pressed: {event.name}')
 
 					return self.cb(event) or 0
@@ -129,8 +140,7 @@ g_triggers = False
 g_key_queue = queue.Queue()
 g_hotkeys = [
 	HotkeySimple(Config.KEY_EXIT_LOOP.split('+'), lambda _: trigger_exit() or -1),
-	# HotkeySimple(['ctrl','c'], lambda _: trigger_exit() or -1),
-	HotkeySimple(['ctrl','c'], lambda _: log_event(f'forcibly exiting (ctrl+c)', level=Config.LOG_WARNING) or os.kill(os.getpid(), signal.SIGTERM)),
+	HotkeySimple(['ctrl','c'], lambda _: log_event(f'forcibly exiting (ctrl+c)', level=Config.LOG_WARN) or os.kill(os.getpid(), signal.SIGTERM)),
 ]
 g_kind = None # host,client
 g_addr_player_mapping = {} # filled dynamically as players "connect"
@@ -186,6 +196,14 @@ def input_thread_func():
 	""" """
 	global g_running, g_tracking, g_triggers
 
+	# await user selection in case started early
+	while not g_kind:
+		time.sleep(0.5)
+
+	if g_kind == Config.CLIENT and len(Config.KEYS_TRACKED) < 1:
+		Config.TRACK_ALL = True
+		log_event(f'tracking ALL keys', level=Config.LOG_WARN)
+
 	was_pressed = {}
 	while g_running:
 		event = kbd.read_event() # suppress=g_tracking)
@@ -207,29 +225,38 @@ def input_thread_func():
 			if event.name == Config.KEY_ACTIVATE_TRACKING and g_kind != Config.HOST:
 				g_tracking = not g_tracking
 				if g_tracking:
-					log_event(f'tracking active [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARNING)
+					log_event(f'tracking active [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARN)
 				else:
-					log_event(f'tracking disabled [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARNING)
+					log_event(f'tracking disabled [{Config.KEY_ACTIVATE_TRACKING.upper()}]', level=Config.LOG_WARN)
 
 			elif event.name == Config.KEY_ACTIVATE_TRIGGERS and g_kind == Config.HOST:
 				g_triggers = not g_triggers
 				if g_triggers:
-					log_event(f'triggers active [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]', level=Config.LOG_WARNING)
+					log_event(f'triggers active [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]', level=Config.LOG_WARN)
 				else:
-					log_event(f'triggers disabled [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]', level=Config.LOG_WARNING)
+					log_event(f'triggers disabled [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]', level=Config.LOG_WARN)
 
 			else:
 				if not g_tracking:
 					continue
 
-				if g_kind == Config.CLIENT and event.name in Config.KEYS_TRACKED:
-					g_key_queue.put(new_event(Config.EVENT_KEY, event.name))
+				if g_kind == Config.CLIENT and (Config.TRACK_ALL or event.name in Config.KEYS_TRACKED):
+					g_key_queue.put(new_event(Config.EVENT_KEYPRESS, event.name))
 					log_event(f'pressed: {event.name}')
+
+		elif stat == Config.PRESS_RELEASED:
+			if not g_tracking:
+				continue
+
+			if g_kind == Config.CLIENT and event.name in Config.KEYS_TRACKED:
+				g_key_queue.put(new_event(Config.EVENT_KEYRELEASE, event.name))
+				log_event(f'released: {event.name}')
+
 
 	log_event('exiting input thread...')
 
 
-def host_server_thread_func(host=Config.DEFAULT_HOST, port=Config.DEFAULT_PORT):
+def host_server_thread_func(host=None, port=None):
 	""" """
 	# await user selection in case started early
 	while not g_kind:
@@ -237,9 +264,20 @@ def host_server_thread_func(host=Config.DEFAULT_HOST, port=Config.DEFAULT_PORT):
 	if g_kind != Config.HOST:
 		return
 
+	if host is None:
+		host = Config.HOST_ON_IP
+	if port is None:
+		port = Config.HOST_ON_PORT
+
 	with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as serv:
 		serv.setblocking(0)
-		serv.bind((host, port))
+		try:
+			serv.bind((host, port))
+		except OSError:
+			log_event(f'unable to bind to {(host, port)}', level=Config.LOG_ERROR)
+			trigger_exit()
+			return
+
 		log_event(f'server started {serv.getsockname()}')
 
 		while g_running:
@@ -283,7 +321,7 @@ def host_parse_thread_func():
 
 		typ, data = parse_event(data.decode('utf-8'))
 
-		if typ == 'key':
+		if typ in [Config.EVENT_KEYPRESS, Config.EVENT_KEYRELEASE]:
 			# find or create player
 			player_id = None
 			try:
@@ -310,8 +348,12 @@ def host_parse_thread_func():
 
 				# trigger
 				if g_triggers:
-					log_event(f'{sender}[player {player_id}]  TRIGGERED  {data} (-> HOST {keypr})')
-					kbd.press(keypr)
+					if typ == Config.EVENT_KEYPRESS:
+						log_event(f'{sender}[player {player_id}]  TRIGGERED [PRE] {data} (-> HOST {keypr})')
+						kbd.press(keypr)
+					elif typ == Config.EVENT_KEYRELEASE:
+						log_event(f'{sender}[player {player_id}]  TRIGGERED [REL] {data} (-> HOST {keypr})')
+						kbd.release(keypr)
 
 			except KeyError:
 				# if doesn't exist log error and continue;
@@ -323,18 +365,23 @@ def host_parse_thread_func():
 				del g_addr_player_mapping[sender]
 
 		else:
-			log_event(f'(echo) {data} {sender}', level=Config.LOG_WARNING)
+			log_event(f'(echo) {data} {sender}', level=Config.LOG_WARN)
 
 	log_event('exiting host parse thread...')
 
 
-def client_thread_func(host=Config.DEFAULT_HOST, port=Config.DEFAULT_PORT):
+def client_thread_func(host=None, port=None):
 	""" """
 	# await user selection in case started early
 	while not g_kind:
 		time.sleep(0.5)
 	if g_kind != Config.CLIENT:
 		return
+
+	if host is None:
+		host = Config.CONNECT_TO_HOST
+	if port is None:
+		port = Config.CONNECT_TO_PORT
 
 	with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as serv:
 		while g_running:
@@ -387,29 +434,41 @@ def select_kind():
 		print(f'Invalid option')
 
 
-def load_mappings(filename="./config.json"):
+def load_config(filename=None):
 	""" """
 	global g_player_controls_mapping
 	try:
+		if filename is None:
+			filename = './config.json'
+
 		with open(filename, 'r', encoding='utf-8') as fp:
 			cfg_ = json.load(fp)
-		
-		cfg = {}
-		for k, v in cfg_['keybinds'].items():
-			cfg[int(k)] = v
 
-		g_player_controls_mapping = cfg
-		log_event(f'loaded mappings: {g_player_controls_mapping}')
+		if 'keybinds' in cfg_:
+			g_player_controls_mapping.clear()
+			for k, v in cfg_['keybinds'].items():
+				g_player_controls_mapping[int(k)] = v
+			del cfg_['keybinds']
+
+		for k in cfg_:
+			if k.startswith('__comment'):
+				continue
+			setattr(Config, k.upper(), cfg_[k])
+			log_event(f'added {k.upper()}({k}) : {cfg_[k]}', level=Config.LOG_DEBUG)
+
+		log_event(f'loaded mappings: {g_player_controls_mapping}', level=Config.LOG_DEBUG)
 
 	except Exception as e:
 		log_event(f'unable to load config {e}', level=Config.LOG_ERROR)
-		# sample mapping; maps only X key for each player (CLIENT x/x/x -> HOST s/k/n)
+		# sample mapping; maps only 'x' key for each player (CLIENT x/x/x -> HOST s/k/n)
 		g_player_controls_mapping = {0: {"x": "s"}, 1: {"x": "k"}, 2: {"x": "n"}}
 
 
-def main():
+def main(argv):
 	""" """
 	global g_tracking
+
+	load_config()
 
 	try:
 		kind = select_kind()
@@ -429,17 +488,15 @@ def main():
 	if kind == Config.CLIENT:
 		threads['client_thread'].start()
 		
-		log_event(f'Exit bind [{Config.KEY_EXIT_LOOP.upper()}]')
-		log_event(f'Tracking [{Config.KEY_ACTIVATE_TRACKING.upper()}]: {g_tracking}')
+		log_event(f'exit bind [{Config.KEY_EXIT_LOOP.upper()}]')
+		log_event(f'tracking [{Config.KEY_ACTIVATE_TRACKING.upper()}]: {g_tracking}')
 	else: # == Config.HOST
-		load_mappings()
-
 		g_tracking = False
 		threads['host_server_thread'].start()
 		threads['host_parse_thread'].start()
 
-		log_event(f'Exit bind [{Config.KEY_EXIT_LOOP.upper()}]')
-		log_event(f'Triggers [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]: {g_triggers}')
+		log_event(f'exit bind [{Config.KEY_EXIT_LOOP.upper()}]')
+		log_event(f'triggers [{Config.KEY_ACTIVATE_TRIGGERS.upper()}]: {g_triggers}')
 
 	threads['input_thread'].start()
 
@@ -454,4 +511,4 @@ def main():
 
 
 if __name__=='__main__':
-	exit(main())
+	exit(main(sys.argv))
