@@ -24,10 +24,10 @@ class Config:
 	HOST            = 'host'
 	CLIENT          = 'client'
 
-	CONNECT_TO_HOST = '25.15.218.148'
+	CONNECT_TO_HOST = 'localhost'
 	CONNECT_TO_PORT = 7654
 
-	HOST_ON_IP      = '25.32.2.42'
+	HOST_ON_IP      = 'localhost'
 	HOST_ON_PORT    = 7654
 
 	LOG_ERROR   = 3
@@ -50,15 +50,16 @@ class Config:
 
 def log_event(*args, level=Config.LOG_INFO, **kwargs):
 	""" """
-	if    level == Config.LOG_INFO:    lvl_txt = 'INFO'
-	elif  level == Config.LOG_WARN:    lvl_txt = 'WARN'
-	elif  level == Config.LOG_ERROR:   lvl_txt = 'ERROR'
-	elif  level == Config.LOG_DEBUG:   lvl_txt = 'DEBUG'
-	else:                              lvl_txt = 'LOG'
+	lvl_txt = {
+		Config.LOG_ERROR: 'ERROR',
+		Config.LOG_WARN:  'WARN',
+		Config.LOG_INFO:  'INFO',
+		Config.LOG_DEBUG: 'DEBUG',
+	}.get(level, 'LOG')
 
 	if level >= Config.LOG_LEVEL:
 		sys.stderr.write(f'[{lvl_txt}] {str(dt.datetime.now()).replace(" ","_")}: ')
-		sys.stderr.write(*args, **kwargs)
+		sys.stderr.write(', '.join(map(str, args)))
 		sys.stderr.write(f'\n')
 
 
@@ -359,7 +360,7 @@ def host_parse_thread_func():
 				# if doesn't exist log error and continue;
 				log_event(f'player control mapping doesn\'t exist {sender} -> {data}', level=Config.LOG_ERROR)
 
-		elif typ == 'dc':
+		elif typ == EVENT_DISCONNECT:
 			if sender in g_addr_player_mapping:
 				log_event(f'player {g_addr_player_mapping[sender]} {sender} disconnected')
 				del g_addr_player_mapping[sender]

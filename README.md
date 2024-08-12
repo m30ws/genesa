@@ -14,7 +14,7 @@ Keypress capturing is based on boppreh's `keyboard` library and its copy can be 
 
 ## Quick start
 You can specify type in arguments. Otherwise, you will be prompted for it interactively.
-```sh
+```console
 py genesa.py
 
 py genesa.py [host|client]
