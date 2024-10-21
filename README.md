@@ -13,16 +13,16 @@ Keypress capturing is based on boppreh's `keyboard` library and its copy can be 
 - https://github.com/boppreh/keyboard
 
 ## Quick start
-You can specify type in arguments. Otherwise, you will be prompted for it interactively.
+You can run the program directly (by double-clicking) or through command line where you can specify node type in arguments.
+If you don't specify type you will be prompted for it interactively.
 ```console
 py genesa.py
-
 py genesa.py [host|client]
 ```
 
 ## Special keybinds
 The program features a few useful keybinds as well as configurable selection of keys that should
-be tracked.
+be tracked with the following defaults:
 
 | Shortcut | Description |
 | :------: | ----------- |
